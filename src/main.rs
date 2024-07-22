@@ -1,33 +1,54 @@
 use rocket::http::uri::{Absolute, Reference};
 use rocket::outcome::{try_outcome, IntoOutcome};
 use rocket::request::FromRequest;
-use rocket::response::{status, Redirect};
+use rocket::response::Redirect;
 use rocket::{get, http::Status, launch, Build, Rocket};
-use rocket::{routes, uri, State};
+use rocket::{routes, State};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-struct RedirectConfig(HashMap<Box<str>, Absolute<'static>>);
+trait UrlMap {
+    fn lookup(&self, key: &str) -> Option<&Absolute<'static>>;
+    fn maybe_insert(&mut self, key: &str, value: Absolute<'static>) -> bool;
+}
+
+struct MemoryStore(HashMap<Box<str>, Absolute<'static>>);
+
+impl MemoryStore {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl UrlMap for MemoryStore {
+    fn lookup(&self, key: &str) -> Option<&Absolute<'static>> {
+        self.0.get(key)
+    }
+    
+    fn maybe_insert(&mut self, key: &str, value: Absolute<'static>) -> bool {
+        if self.0.contains_key(key) {
+            false
+        } else {
+            self.0.insert(key.into(), value);
+            true
+        }
+    }
+}
+
+struct RedirectConfig(Box<dyn UrlMap + 'static + Send>);
 
 impl RedirectConfig {
-    fn new() -> Self {
-        Self(HashMap::from([(
-            "goog".into(),
-            uri!("https://google.ch"),
-        )]))
+    fn new<S: UrlMap + Send + 'static>(store: S) -> Self {
+        Self(Box::new(store))
     }
 
     fn add(&mut self, name: &str, url: Absolute<'static>) -> bool {
-        if self.0.contains_key(name) {
-            return false;
-        }
-        self.0.insert(name.to_owned().into_boxed_str(), url);
-        return true;
+        self.0.maybe_insert(name, url)
     }
 
     fn lookup(&self, name: &str) -> Option<&Absolute<'static>> {
-        self.0.get(name)
+        self.0.lookup(name)
     }
 }
 
@@ -77,5 +98,5 @@ fn create_new(redirects: &State<Mutex<RedirectConfig>>, name: &str, to: String) 
 fn entry() -> Rocket<Build> {
     rocket::build()
         .mount("/", routes![redirect, create_new])
-        .manage(Mutex::new(RedirectConfig::new()))
+        .manage(Mutex::new(RedirectConfig::new(MemoryStore::new())))
 }
