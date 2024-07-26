@@ -4,7 +4,7 @@ use rustdirect::{storage, handlers, RedirectConfig};
 #[launch]
 fn entry() -> Rocket<Build> {
     rocket::build()
-        .mount("/", routes![handlers::redirect, handlers::create_new])
+        .mount("/", routes![handlers::redirect, handlers::create_new, handlers::create_new_form])
         .attach(AdHoc::try_on_ignite("Storage", |rocket| async move {
             let storage: String = rocket.figment().extract_inner("store").expect("store");
             let store = if storage == ":memory:" {
