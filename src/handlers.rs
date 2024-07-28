@@ -11,7 +11,7 @@ use rocket::{
 };
 
 use crate::{RedirectConfig, RedirectToken};
-use std::path::{Component, PathBuf};
+use std::path::PathBuf;
 
 mod rendering {
     use maud::{html, Markup};
@@ -50,6 +50,18 @@ mod rendering {
     }
 }
 
+#[cfg(not(feature = "noui"))]
+#[get("/")]
+pub fn index() -> Redirect {
+    Redirect::to("/_internal/ui/")
+}
+
+#[cfg(feature = "noui")]
+#[get("/")]
+pub fn index() -> Redirect {
+    Redirect::to(uri!(create_new_form("")))
+}
+
 #[get("/<_>/<additional..>")]
 pub fn redirect(token: RedirectToken, additional: PathBuf) -> Redirect {
     let path = additional.as_path().to_str().unwrap_or("");
@@ -57,8 +69,10 @@ pub fn redirect(token: RedirectToken, additional: PathBuf) -> Redirect {
     Redirect::to(to.into_normalized())
 }
 
+#[cfg(feature = "noui")]
 #[get("/_internal/new/<name..>")]
 pub async fn create_new_form(name: PathBuf) -> Markup {
+    use std::fs::Component;
     let name = name
         .components()
         .filter(|c| matches!(c, Component::Normal(_)))

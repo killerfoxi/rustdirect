@@ -136,7 +136,7 @@ fn switch(routes: Nav) -> Html {
 #[function_component(App)]
 fn app() -> Html {
     html! {
-        <BrowserRouter>
+        <BrowserRouter basename="/_internal/ui">
             <Switch<Nav> render={switch} />
         </BrowserRouter>
     }
