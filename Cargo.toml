@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 maud = { version = "0.26.0", features = ["rocket"] }
 rocket = "0.5.1"
+
+[workspace]
+members = ["ui"]
