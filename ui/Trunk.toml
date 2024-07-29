@@ -4,4 +4,3 @@ port = 8082
 
 [build]
 public_url = "/_internal/ui"
-no_sri=true

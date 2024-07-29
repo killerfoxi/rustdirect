@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-material-yew = { version = "0.3.0", features = ["full"] }
+leptos = { version = "0.6.13", features = ["csr"] }
+leptos_router = { version = "0.6.13", features = ["csr"] }
 reqwasm = "0.5.0"
-yew = { version = "0.20", features = ["csr"] }
-yew-router = "0.17"
+thaw = { version = "0.3.3", features = ["csr"] }

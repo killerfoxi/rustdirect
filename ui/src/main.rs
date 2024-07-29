@@ -1,173 +1,104 @@
-use material_yew::{
-    button::MatButton,
-    drawer::{MatDrawer, MatDrawerAppContent, MatDrawerTitle},
-    list::{ListIndex, MatList, MatListItem},
-    text_inputs::MatTextField,
-    top_app_bar_fixed::{MatTopAppBarFixed, MatTopAppBarNavigationIcon, MatTopAppBarTitle},
-    snackbar::MatSnackbar,
-    MatIconButton, WeakComponentLink,
-};
-use yew::{platform::spawn_local, prelude::*};
-use yew_router::prelude::*;
+use leptos::*;
+use leptos_router::*;
+use thaw::*;
+use reqwasm::http::Request;
 
-#[derive(Clone, Routable, PartialEq)]
-enum Nav {
-    #[at("/")]
-    Main,
-    #[at("/new")]
-    New,
+#[component]
+fn Home() -> impl IntoView {
+    view! {
+        <h1>"What's this?"</h1>
+        <p>Create quick and easy redirects</p>
+    }
 }
 
-#[function_component(Menu)]
-fn menu() -> Html {
-    let navigator = use_navigator().unwrap();
-    let onaction = Callback::from(move |idx| {
-        if let ListIndex::Single(Some(idx)) = idx {
-            match idx {
-                0 => navigator.push(&Nav::Main),
-                1 => navigator.push(&Nav::New),
-                _ => (),
+#[component]
+fn New() -> impl IntoView {
+    let message = use_message();
+    let name = RwSignal::new(String::new());
+    let url = RwSignal::new(String::new());
+    let create_link = create_action(move |(name, url): &(String, String)| {
+        let name = name.clone();
+        let url = url.clone();
+        async move {
+            match Request::get(&format!("/_internal/new?name={name}&to={url}")).send().await {
+                Ok(resp) => {
+                    match resp.status() {
+                        201 => message.create("Success in creating redirect!".into(), MessageVariant::Success, Default::default()),
+                        409 => message.create(format!("{name} already exists"), MessageVariant::Error, Default::default()),
+                        502 => message.create("Server said no!".into(), MessageVariant::Error, Default::default()),
+                        x => message.create(format!("Unknown error code: {x}"), MessageVariant::Error, Default::default()),
+                    }
+                }
+                Err(err) => message.create(format!("Could not talk to server: {err}"), MessageVariant::Error, Default::default()),
             }
         }
     });
-    html! {
-        <MatList onaction={onaction}>
-            <MatListItem>{"Home"}</MatListItem>
-            <MatListItem>{"New"}</MatListItem>
-        </MatList>
+    view! {
+        <h1>"Something new"</h1>
+        <Space vertical=true>
+            <Space>
+                <Input value=name />
+                <Input value=url />
+            </Space>
+            <Button variant=ButtonVariant::Primary on_click=move |_| create_link.dispatch((name.get(), url.get()))>Create!</Button>
+        </Space>
     }
 }
 
-#[derive(Properties, PartialEq)]
-struct ContentProps {
-    pub children: Children,
-}
-
-#[function_component(Content)]
-fn content(prop: &ContentProps) -> Html {
-    let drawer_link = use_state(WeakComponentLink::<MatDrawer>::default);
-    let nav_click = {
-        let drawer_link = drawer_link.clone();
-        Callback::from(move |_| drawer_link.flip_open_state())
-    };
-    html! {
-        <MatDrawer drawer_type="dismissible" drawer_link={(*drawer_link).clone()}>
-            <MatDrawerTitle>{"Menu"}</MatDrawerTitle>
-            <div>
-                <Menu />
-            </div>
-            <MatDrawerAppContent>
-                <MatTopAppBarFixed onnavigationiconclick={nav_click}>
-                    <MatTopAppBarNavigationIcon><MatIconButton icon="menu" /></MatTopAppBarNavigationIcon>
-                    <MatTopAppBarTitle>{"Oxidized Redirect"}</MatTopAppBarTitle>
-                </MatTopAppBarFixed>
-                <main>
-                    {for prop.children.iter()}
-                </main>
-            </MatDrawerAppContent>
-        </MatDrawer>
+#[component]
+fn Content() -> impl IntoView {
+    let navigate = use_navigate();
+    let selected = RwSignal::new("home".to_string());
+    create_effect(move |_| {
+        let sel = use_location().pathname.get().strip_prefix("/_internal/ui/").unwrap().to_owned();
+        if sel.is_empty() {
+            selected.set("home".to_string());
+        } else {
+            selected.set(sel);
+        }
+    });
+    _ = selected.watch(move |name| {
+        navigate(&format!("/_internal/ui/{name}"), Default::default());
+    });
+    view! {
+        <Layout position=LayoutPosition::Absolute>
+            <LayoutHeader style="border-bottom: 1px solid grey;">
+                <Space>
+                    <h1>Oxidized Redirects</h1>
+                </Space>
+            </LayoutHeader>
+            <Layout has_sider=true>
+                <LayoutSider>
+                    <Menu value=selected>
+                        <MenuItem key="home" label="Home" />
+                        <MenuItem key="new" label="New" />
+                    </Menu>
+                </LayoutSider>
+                <Layout>
+                    <MessageProvider>
+                        <Routes>
+                            <Route path="/_internal/ui/*any" view=Home />
+                            <Route path="/_internal/ui/new" view=New />
+                        </Routes>
+                    </MessageProvider>
+                </Layout>
+            </Layout>
+        </Layout>
     }
 }
 
-#[function_component(CreateNew)]
-fn create_new() -> Html {
-    use reqwasm::http::Request;
-    let name = use_state(String::new);
-    let url = use_state(String::new);
-    let outcome = use_state(String::new);
-    let snackbar_link = use_state(WeakComponentLink::<MatSnackbar>::default);
-    let onclick = {
-        let name = name.clone();
-        let url = url.clone();
-        let outcome = outcome.clone();
-        let snackbar_link = snackbar_link.clone();
-        Callback::from(move |_| {
-            let name = name.clone();
-            let url = url.clone();
-            let outcome = outcome.clone();
-            let snackbar_link = snackbar_link.clone();
-            spawn_local(async move {
-                match Request::get(&format!("/_internal/new?name={}&to={}", *name, *url)) 
-                    .send()
-                    .await {
-                        Ok(resp) => {
-                            match resp.status() {
-                                201 => {
-                                    name.set(String::new());
-                                    url.set(String::new());
-                                    outcome.set("Successfully created!".to_owned())
-                                },
-                                409 => outcome.set(format!("{} already exists", *name)),
-                                x => outcome.set(format!("Received an unknown status: {x}")),
-                            };
-                            snackbar_link.show();
-                        },
-                        Err(err) => {
-                            outcome.set(format!("Failure: {err}"));
-                        }
-                    }
-            });
-        })
-    };
-    html! {
-        <>
-            <MatSnackbar label_text={(*outcome).clone()} snackbar_link={(*snackbar_link).clone()} />
-            <div>
-                <MatTextField
-                    outlined=true
-                    required=true
-                    label="Name"
-                    value={(*name).clone()}
-                    oninput={let name = name.clone(); Callback::from(move |e: String| name.set(e))}
-                />
-                {" "}
-                <MatTextField
-                    outlined=true
-                    required=true
-                    label="Url"
-                    size=50
-                    value={(*url).clone()}
-                    oninput={let url = url.clone(); Callback::from(move |e: String| url.set(e))}
-                />
-            </div>
-            <div style="margin-top: 0.5rem;">
-                <span onclick={onclick}>
-                    <MatButton
-                        label="Create"
-                        raised=true
-                    />
-                </span>
-            </div>
-        </>
-    }
-}
-
-fn switch(routes: Nav) -> Html {
-    match routes {
-        Nav::Main => html! {
-            <Content>
-                <h1>{"What?"}</h1>
-                <p>{"Tired of remembering urls? Create a convenience name for it!"}</p>
-            </Content>
-        },
-        Nav::New => html! {
-            <Content>
-                <h1>{"Creating new redirect"}</h1>
-                <CreateNew />
-            </Content>
-        },
-    }
-}
-
-#[function_component(App)]
-fn app() -> Html {
-    html! {
-        <BrowserRouter basename="/_internal/ui">
-            <Switch<Nav> render={switch} />
-        </BrowserRouter>
+#[component]
+fn App() -> impl IntoView {
+    view! {
+        <Router>
+            <ThemeProvider theme=Theme::light()>
+                <GlobalStyle />
+                <Content />
+            </ThemeProvider>
+        </Router>
     }
 }
 
 fn main() {
-    yew::Renderer::<App>::new().render();
+    mount_to_body(App)
 }
