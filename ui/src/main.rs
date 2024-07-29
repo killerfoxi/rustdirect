@@ -4,6 +4,7 @@ use material_yew::{
     list::{ListIndex, MatList, MatListItem},
     text_inputs::MatTextField,
     top_app_bar_fixed::{MatTopAppBarFixed, MatTopAppBarNavigationIcon, MatTopAppBarTitle},
+    snackbar::MatSnackbar,
     MatIconButton, WeakComponentLink,
 };
 use yew::{platform::spawn_local, prelude::*};
@@ -60,7 +61,9 @@ fn content(prop: &ContentProps) -> Html {
                     <MatTopAppBarNavigationIcon><MatIconButton icon="menu" /></MatTopAppBarNavigationIcon>
                     <MatTopAppBarTitle>{"Oxidized Redirect"}</MatTopAppBarTitle>
                 </MatTopAppBarFixed>
-                {for prop.children.iter()}
+                <main>
+                    {for prop.children.iter()}
+                </main>
             </MatDrawerAppContent>
         </MatDrawer>
     }
@@ -71,21 +74,44 @@ fn create_new() -> Html {
     use reqwasm::http::Request;
     let name = use_state(String::new);
     let url = use_state(String::new);
+    let outcome = use_state(String::new);
+    let snackbar_link = use_state(WeakComponentLink::<MatSnackbar>::default);
     let onclick = {
         let name = name.clone();
         let url = url.clone();
+        let outcome = outcome.clone();
+        let snackbar_link = snackbar_link.clone();
         Callback::from(move |_| {
-            let name = (*name).clone();
-            let url = (*url).clone();
+            let name = name.clone();
+            let url = url.clone();
+            let outcome = outcome.clone();
+            let snackbar_link = snackbar_link.clone();
             spawn_local(async move {
-                let _ = Request::get(&format!("/_internal/new?name={}&to={}", name, url))
+                match Request::get(&format!("/_internal/new?name={}&to={}", *name, *url)) 
                     .send()
-                    .await;
+                    .await {
+                        Ok(resp) => {
+                            match resp.status() {
+                                201 => {
+                                    name.set(String::new());
+                                    url.set(String::new());
+                                    outcome.set("Successfully created!".to_owned())
+                                },
+                                409 => outcome.set(format!("{} already exists", *name)),
+                                x => outcome.set(format!("Received an unknown status: {x}")),
+                            };
+                            snackbar_link.show();
+                        },
+                        Err(err) => {
+                            outcome.set(format!("Failure: {err}"));
+                        }
+                    }
             });
         })
     };
     html! {
         <>
+            <MatSnackbar label_text={(*outcome).clone()} snackbar_link={(*snackbar_link).clone()} />
             <div>
                 <MatTextField
                     outlined=true

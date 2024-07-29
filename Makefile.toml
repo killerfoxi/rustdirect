@@ -1,0 +1,12 @@
+[tasks.build]
+args = ["build"]
+
+[tasks.interal-run]
+private = true
+command = "cargo"
+args = ["run"]
+
+[tasks.run]
+clear = true
+dependencies = ["build", "internal-run"]
+workspace = true
