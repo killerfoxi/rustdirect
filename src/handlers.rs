@@ -56,6 +56,11 @@ pub fn index() -> Redirect {
     Redirect::to("/_internal/ui/")
 }
 
+#[get("/favicon.ico")]
+pub fn favicon() -> Result<(), ()> {
+    Err(())
+}
+
 #[cfg(feature = "noui")]
 #[get("/")]
 pub fn index() -> Redirect {

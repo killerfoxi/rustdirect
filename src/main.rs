@@ -1,9 +1,9 @@
-use rocket::{fairing::AdHoc, fs::FileServer, launch, routes, tokio::sync::Mutex, Build, Rocket};
+use rocket::{fairing::AdHoc, fs::{FileServer, Options}, launch, routes, tokio::sync::Mutex, Build, Rocket};
 use rustdirect::{storage, handlers, RedirectConfig};
 
 #[launch]
 fn entry() -> Rocket<Build> {
-    let routes = routes![handlers::index, handlers::redirect, handlers::create_new];
+    let routes = routes![handlers::index, handlers::redirect, handlers::create_new, handlers::favicon];
     #[cfg(feature = "noui")]
     routes.extend(routes![handlers::create_new_form]);
     let rocket = rocket::build()
@@ -21,6 +21,6 @@ fn entry() -> Rocket<Build> {
             Ok(rocket.manage(Mutex::new(store)))
         }));
     #[cfg(not(feature = "noui"))]
-    let rocket = rocket.mount("/_internal/ui", FileServer::from("ui/dist"));
+    let rocket = rocket.mount("/_internal/ui", FileServer::new("ui/dist", Options::Index | Options::NormalizeDirs).rank(-15));
     rocket
 }
