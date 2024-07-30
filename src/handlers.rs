@@ -25,6 +25,7 @@ mod rendering {
         }
     }
 
+    #[cfg(feature = "noui")]
     pub fn bad_gateway(info: Markup) -> Markup {
         html! {
             h1 { "Whoopsie the gateway has gone bad"}
