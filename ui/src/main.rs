@@ -1,7 +1,7 @@
 use leptos::*;
 use leptos_router::*;
-use thaw::*;
 use reqwasm::http::Request;
+use thaw::*;
 
 #[component]
 fn Home() -> impl IntoView {
@@ -20,16 +20,43 @@ fn New() -> impl IntoView {
         let name = name.clone();
         let url = url.clone();
         async move {
-            match Request::get(&format!("/_internal/new?name={name}&to={url}")).send().await {
-                Ok(resp) => {
-                    match resp.status() {
-                        201 => message.create("Success in creating redirect!".into(), MessageVariant::Success, Default::default()),
-                        409 => message.create(format!("{name} already exists"), MessageVariant::Error, Default::default()),
-                        502 => message.create("Server said no!".into(), MessageVariant::Error, Default::default()),
-                        x => message.create(format!("Unknown error code: {x}"), MessageVariant::Error, Default::default()),
+            match Request::get(&format!("/_internal/new?name={name}&to={url}"))
+                .send()
+                .await
+            {
+                Ok(resp) => match resp.status() {
+                    201 => message.create(
+                        "Success in creating redirect!".into(),
+                        MessageVariant::Success,
+                        Default::default(),
+                    ),
+                    409 => message.create(
+                        format!("{name} already exists"),
+                        MessageVariant::Error,
+                        Default::default(),
+                    ),
+                    502 => {
+                        let msg = resp
+                            .text()
+                            .await
+                            .unwrap_or("<failed to obtain reason>".into());
+                        message.create(
+                            format!("Server said no! Because: {msg}",),
+                            MessageVariant::Error,
+                            MessageOptions { duration: std::time::Duration::from_secs(0), closable: true }
+                        )
                     }
-                }
-                Err(err) => message.create(format!("Could not talk to server: {err}"), MessageVariant::Error, Default::default()),
+                    x => message.create(
+                        format!("Unknown error code: {x}"),
+                        MessageVariant::Error,
+                        Default::default(),
+                    ),
+                },
+                Err(err) => message.create(
+                    format!("Could not talk to server: {err}"),
+                    MessageVariant::Error,
+                    Default::default(),
+                ),
             }
         }
     });
@@ -50,7 +77,12 @@ fn Content() -> impl IntoView {
     let navigate = use_navigate();
     let selected = RwSignal::new("home".to_string());
     create_effect(move |_| {
-        let sel = use_location().pathname.get().strip_prefix("/_internal/ui/").unwrap().to_owned();
+        let sel = use_location()
+            .pathname
+            .get()
+            .strip_prefix("/_internal/ui/")
+            .unwrap()
+            .to_owned();
         if sel.is_empty() {
             selected.set("home".to_string());
         } else {

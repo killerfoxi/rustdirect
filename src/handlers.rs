@@ -112,12 +112,14 @@ pub async fn create_new(
                 (Status::Conflict, rendering::conflict(name))
             }
         }
-        Err(err) => (
-            Status::BadGateway,
-            rendering::bad_gateway(html! {
+        Err(err) => {
+            let msg = html! { (err) };
+            #[cfg(feature = "noui")]
+            let msg = rendering::bad_gateway(html! {
                 p { "The provided url isn't valid." }
-                p { (err) }
-            })
-        ),
+                p { (msg) }
+            });
+            (Status::BadGateway, msg)
+        }
     }
 }
