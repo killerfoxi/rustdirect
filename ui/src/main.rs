@@ -21,13 +21,9 @@ mod input_validation {
     }
 }
 
-#[component]
-fn ValidatedInput(value: RwSignal<String>, label: String, validation_cb: Callback<String, bool>) -> impl IntoView {
-    let invalid = RwSignal::new(false);
-    create_effect(move |_| invalid.set(!validation_cb.call(value.get())));
-    view! {
-        <Input value=value placeholder=label invalid=invalid />
-    }
+#[inline]
+fn validated_input(value: Signal<String>, validation_cb: impl Fn(String) -> bool + 'static) -> Signal<bool> {
+    Signal::derive(move || !validation_cb(value.get()))
 }
 
 #[component]
@@ -62,7 +58,10 @@ fn New() -> impl IntoView {
                         message.create(
                             format!("Server said no! Because: {msg}",),
                             MessageVariant::Error,
-                            MessageOptions { duration: std::time::Duration::from_secs(0), closable: true }
+                            MessageOptions {
+                                duration: std::time::Duration::from_secs(0),
+                                closable: true,
+                            },
                         )
                     }
                     x => message.create(
@@ -81,13 +80,23 @@ fn New() -> impl IntoView {
     });
     view! {
         <h1>"Something new"</h1>
-        <Space vertical=true>
             <Space>
-                <ValidatedInput value=name validation_cb=Callback::from(input_validation::name) label="name".into() />
-                <ValidatedInput value=url validation_cb=Callback::from(input_validation::url) label="url".into() />
+                <Space vertical=true>
+                    <Space>
+                        <Input value=name invalid={validated_input(name.into(), input_validation::name)} placeholder="name">
+                            <InputPrefix slot>
+                                <Icon icon=icondata::AiTagOutlined />
+                            </InputPrefix>
+                        </Input>
+                        <Input value=url invalid={validated_input(url.into(), input_validation::url)} placeholder="url" attr:size=50>
+                            <InputPrefix slot>
+                                <Icon icon=icondata::AiLinkOutlined />
+                            </InputPrefix>
+                        </Input>
+                    </Space>
+                    <Button variant=ButtonVariant::Primary on_click=move |_| create_link.dispatch((name.get(), url.get())) block=true>Create!</Button>
+                </Space>
             </Space>
-            <Button variant=ButtonVariant::Primary on_click=move |_| create_link.dispatch((name.get(), url.get()))>Create!</Button>
-        </Space>
     }
 }
 
@@ -111,21 +120,26 @@ fn Content() -> impl IntoView {
     _ = selected.watch(move |name| {
         navigate(&format!("/_internal/ui/{name}"), Default::default());
     });
+    let menu = RwSignal::new(true);
+    let toggle_menu = Callback::from(move |_| { let old = menu.get_untracked(); menu.set(!old); });
     view! {
         <Layout position=LayoutPosition::Absolute>
-            <LayoutHeader style="border-bottom: 1px solid grey;">
-                <Space>
+            <LayoutHeader style="border-bottom: 1px solid grey; padding-left: 0.5rem;">
+                <Space align=SpaceAlign::Center gap=SpaceGap::Large>
+                    <Icon width="2em" height="2em" icon=icondata::AiMenuOutlined on_click=toggle_menu style="cursor: pointer;" />
                     <h1>Oxidized Redirects</h1>
                 </Space>
             </LayoutHeader>
-            <Layout has_sider=true>
-                <LayoutSider>
-                    <Menu value=selected>
-                        <MenuItem key="home" label="Home" />
-                        <MenuItem key="new" label="New" />
-                    </Menu>
-                </LayoutSider>
-                <Layout>
+            <Layout has_sider=menu>
+                <Show when=move || menu.get() fallback=|| view! {}>
+                    <LayoutSider style="border-right: 1px solid #eee;">
+                        <Menu value=selected>
+                            <MenuItem icon=icondata::AiHomeOutlined key="home" label="Home" />
+                            <MenuItem icon=icondata::AiPlusOutlined key="new" label="New" />
+                        </Menu>
+                    </LayoutSider>
+                </Show>
+                <Layout style="margin-left: 1rem;">
                     <MessageProvider>
                         <Routes>
                             <Route path="/_internal/ui/*any" view=Home />
