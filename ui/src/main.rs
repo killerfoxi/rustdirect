@@ -11,6 +11,25 @@ fn Home() -> impl IntoView {
     }
 }
 
+mod input_validation {
+    pub fn name(val: String) -> bool {
+        val != "_internal" && !val.contains('/')
+    }
+
+    pub fn url(val: String) -> bool {
+        val.starts_with("http")
+    }
+}
+
+#[component]
+fn ValidatedInput(value: RwSignal<String>, label: String, validation_cb: Callback<String, bool>) -> impl IntoView {
+    let invalid = RwSignal::new(false);
+    create_effect(move |_| invalid.set(!validation_cb.call(value.get())));
+    view! {
+        <Input value=value placeholder=label invalid=invalid />
+    }
+}
+
 #[component]
 fn New() -> impl IntoView {
     let message = use_message();
@@ -64,8 +83,8 @@ fn New() -> impl IntoView {
         <h1>"Something new"</h1>
         <Space vertical=true>
             <Space>
-                <Input value=name />
-                <Input value=url />
+                <ValidatedInput value=name validation_cb=Callback::from(input_validation::name) label="name".into() />
+                <ValidatedInput value=url validation_cb=Callback::from(input_validation::url) label="url".into() />
             </Space>
             <Button variant=ButtonVariant::Primary on_click=move |_| create_link.dispatch((name.get(), url.get()))>Create!</Button>
         </Space>
